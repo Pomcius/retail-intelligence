@@ -21,6 +21,8 @@ data/processed/*.csv
 
 # Environment / secrets
 .env
+.env.*
+.streamlit/secrets.toml
 
 # Editor
 .vscode/

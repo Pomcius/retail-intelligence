@@ -48,8 +48,8 @@ with col2:
         .assign(
             Customers=lambda d: d["customers"].map(dashboard.format_number),
             Revenue=lambda d: d["total_revenue"].map(dashboard.format_currency_compact),
-            **{"% of revenue": lambda d: d["pct_of_revenue"].round(1).astype(str) + "%"},
-        )[["segment", "Customers", "Revenue", "% of revenue"]]
+            **{"% Revenue": lambda d: d["pct_of_revenue"].round(1).astype(str) + "%"},
+        )[["segment", "Customers", "Revenue", "% Revenue"]]
         .rename(columns={"segment": "Segment"}),
         hide_index=True, width="stretch",
     )
