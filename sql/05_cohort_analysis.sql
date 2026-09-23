@@ -72,7 +72,9 @@ WITH ranked AS (
 first_second AS (
     SELECT
         a.customer_unique_id,
-        DATE_DIFF('day', a.order_purchase_timestamp, b.order_purchase_timestamp) AS days_to_second_purchase
+        -- FLOOR(seconds / 86400) = exact elapsed days, matching pandas
+        -- Timedelta.days — see README.md, "Cross-Language Consistency"
+        FLOOR(DATE_DIFF('second', a.order_purchase_timestamp, b.order_purchase_timestamp) / 86400.0) AS days_to_second_purchase
     FROM ranked a
     JOIN ranked b ON a.customer_unique_id = b.customer_unique_id AND a.rn = 1 AND b.rn = 2
 )

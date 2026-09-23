@@ -65,6 +65,11 @@ first_two AS (
 )
 SELECT
     COUNT(*)                                                   AS repeat_customers,
-    ROUND(AVG(DATE_DIFF('day', first_order_ts, second_order_ts)), 1) AS avg_days_to_second_order,
-    ROUND(MEDIAN(DATE_DIFF('day', first_order_ts, second_order_ts)), 1) AS median_days_to_second_order
+    -- FLOOR(seconds / 86400) matches pandas Timedelta.days (floor of exact
+    -- elapsed time). DATE_DIFF('day', ...) instead counts calendar-date
+    -- boundaries crossed, and DuckDB's CAST(...AS INTEGER) rounds rather than
+    -- truncates — both would silently disagree with pandas here (see
+    -- README.md, "Cross-Language Consistency").
+    ROUND(AVG(FLOOR(DATE_DIFF('second', first_order_ts, second_order_ts) / 86400.0)), 1) AS avg_days_to_second_order,
+    ROUND(MEDIAN(FLOOR(DATE_DIFF('second', first_order_ts, second_order_ts) / 86400.0)), 1) AS median_days_to_second_order
 FROM first_two;

@@ -27,6 +27,18 @@ def orders_analytics() -> pd.DataFrame:
         "delivery_days":       pd.array([10, 8, pd.NA, 6, pd.NA], dtype="Int64"),
         "delivery_delay_days": pd.array([5, -1, pd.NA, -3, pd.NA], dtype="Int64"),
         "avg_review_score":    [2.0, 5.0, None, 4.0, 1.0],
+        "customer_state":      ["SP", "SP", "RJ", "MG", "SP"],
+    })
+
+
+@pytest.fixture
+def order_items_analytics() -> pd.DataFrame:
+    return pd.DataFrame({
+        "order_id":        ["o1", "o1", "o2", "o3"],
+        "order_item_id":   [1, 2, 1, 1],
+        "is_delivered":    [True, True, True, False],
+        "price":           [60.0, 40.0, 50.0, 999.0],
+        "product_category_english": ["toys", "books", "toys", "toys"],
     })
 
 
@@ -81,3 +93,39 @@ def test_monthly_summary_groups_by_purchase_month(orders_analytics):
     assert summary.loc["2018-01", "revenue"] == 300.0  # o1 + o3
     assert summary.loc["2018-01", "order_count"] == 2
     assert summary.loc["2018-02", "revenue"] == 50.0
+
+
+def test_revenue_by_category_excludes_non_delivered_items(order_items_analytics):
+    result = m.revenue_by_category(order_items_analytics).set_index("product_category_english")
+    # o3 (non-delivered, 999.0) must not appear anywhere
+    assert result["revenue"].sum() == pytest.approx(60.0 + 40.0 + 50.0)
+    assert result.loc["toys", "revenue"] == pytest.approx(110.0)
+    assert result.loc["toys", "order_count"] == 2  # o1 and o2, not summed with books' order
+    assert result["pct_of_revenue"].sum() == pytest.approx(1.0)
+
+
+def test_revenue_by_state_excludes_non_delivered(orders_analytics):
+    result = m.revenue_by_state(orders_analytics).set_index("customer_state")
+    # o5 (canceled, SP, 999.0) must not inflate SP's revenue
+    assert result.loc["SP", "revenue"] == pytest.approx(150.0)  # o1 + o2
+    assert result.loc["SP", "customers"] == 1  # c1 only (o5 excluded, and c1 counted once)
+
+
+def test_review_score_by_delay_bucket_assigns_correct_buckets(orders_analytics):
+    result = m.review_score_by_delay_bucket(orders_analytics).set_index("delay_bucket")
+    # o1: delay=5 -> "1-3d late"? no: 5 is >3 and <=7 -> "4-7d late"
+    assert result.loc["4-7d late", "avg_review_score"] == 2.0
+    # o2: delay=-1 -> "On-time / early"; o4: delay=-3 -> "On-time / early"
+    assert result.loc["On-time / early", "orders"] == 2
+    assert result.loc["On-time / early", "avg_review_score"] == pytest.approx((5.0 + 4.0) / 2)
+    # o3 (no delivery date) must not appear in any bucket
+    assert result["orders"].sum() == 3
+
+
+def test_state_delivery_summary_uses_timing_eligible_only(orders_analytics):
+    result = m.state_delivery_summary(orders_analytics).set_index("customer_state")
+    # SP has o1 (late) and o2 (on-time) timing-eligible; o5 excluded (not delivered)
+    assert result.loc["SP", "timing_eligible_orders"] == 2
+    assert result.loc["SP", "on_time_rate_pct"] == pytest.approx(50.0)
+    # RJ's only order (o3) has no delivery timestamp -> RJ shouldn't appear at all
+    assert "RJ" not in result.index

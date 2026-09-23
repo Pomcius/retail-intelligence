@@ -12,6 +12,7 @@ not raw CSVs, and never hard-code results.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from src.cleaning import filter_delivered_orders
@@ -135,3 +136,72 @@ def monthly_summary(orders_analytics: pd.DataFrame) -> pd.DataFrame:
     summary["month"] = summary["month"].astype(str)
     summary["aov"] = summary["revenue"] / summary["order_count"]
     return summary
+
+
+def revenue_by_category(order_items_analytics: pd.DataFrame, top_n: int | None = None) -> pd.DataFrame:
+    """Revenue, item count, and order count by product category, at item
+    grain (order_items_analytics), delivered items only. order_count values
+    must not be summed across categories and reported as "total orders" —
+    a single order can span multiple categories."""
+    delivered_items = order_items_analytics[order_items_analytics["is_delivered"]]
+    summary = (
+        delivered_items.groupby("product_category_english")
+        .agg(revenue=("price", "sum"), item_count=("order_item_id", "count"), order_count=("order_id", "nunique"))
+        .reset_index()
+        .sort_values("revenue", ascending=False)
+    )
+    summary["pct_of_revenue"] = summary["revenue"] / summary["revenue"].sum()
+    return summary.head(top_n) if top_n else summary
+
+
+def revenue_by_state(orders_analytics: pd.DataFrame) -> pd.DataFrame:
+    """Revenue, orders, customers, and AOV by customer_state, delivered
+    orders only."""
+    delivered = filter_delivered_orders(orders_analytics)
+    summary = (
+        delivered.groupby("customer_state")
+        .agg(revenue=("item_revenue", "sum"), orders=("order_id", "nunique"),
+             customers=("customer_unique_id", "nunique"))
+        .reset_index()
+        .sort_values("revenue", ascending=False)
+    )
+    summary["aov"] = summary["revenue"] / summary["orders"]
+    return summary
+
+
+def review_score_by_delay_bucket(orders_analytics: pd.DataFrame) -> pd.DataFrame:
+    """Average review score by delivery-delay bucket, among timing-eligible
+    delivered orders. Bucket boundaries match sql/04_delivery_analysis.sql."""
+    eligible = delivery_timing_eligible(orders_analytics).copy()
+    order = ["Early >7d", "On-time / early", "1-3d late", "4-7d late", "8+d late"]
+    conditions = [
+        eligible["delivery_delay_days"] < -7,
+        eligible["delivery_delay_days"] <= 0,
+        eligible["delivery_delay_days"] <= 3,
+        eligible["delivery_delay_days"] <= 7,
+    ]
+    eligible["delay_bucket"] = np.select(conditions, order[:4], default=order[4])
+
+    summary = (
+        eligible.groupby("delay_bucket")
+        .agg(orders=("order_id", "nunique"), avg_review_score=("avg_review_score", "mean"))
+        .reindex(order)
+        .reset_index()
+    )
+    return summary
+
+
+def state_delivery_summary(orders_analytics: pd.DataFrame) -> pd.DataFrame:
+    """On-time rate, average delivery time, and average review score by
+    customer_state, among timing-eligible delivered orders."""
+    eligible = delivery_timing_eligible(orders_analytics)
+    summary = (
+        eligible.groupby("customer_state")
+        .agg(timing_eligible_orders=("order_id", "nunique"),
+             avg_delivery_days=("delivery_days", "mean"),
+             avg_review_score=("avg_review_score", "mean"),
+             on_time_orders=("delivery_delay_days", lambda s: (s <= 0).sum()))
+        .reset_index()
+    )
+    summary["on_time_rate_pct"] = summary["on_time_orders"] / summary["timing_eligible_orders"] * 100
+    return summary.sort_values("timing_eligible_orders", ascending=False)

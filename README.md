@@ -1,14 +1,10 @@
 # Retail Intelligence
 
-A business intelligence platform analyzing revenue, customer retention, and delivery operations for a Brazilian e-commerce marketplace.
-
-## Status
-
-🚧 Early development. Core metrics, retention, and customer segmentation analysis are complete and verified (Phases 4–5); the interactive dashboard has not been built yet — see [Core Metrics](#core-metrics) and [Customer Retention & Segmentation](#customer-retention--segmentation) below.
+An interactive business intelligence dashboard analyzing revenue, customer retention, and delivery operations for a real Brazilian e-commerce marketplace.
 
 ## Overview
 
-E-commerce businesses generate large volumes of transactional data — orders, payments, reviews, delivery logs — but turning that into decisions requires clean data, correct metrics, and clear analysis. This project analyzes ~100,000 real orders from [Olist](https://olist.com), a Brazilian e-commerce marketplace, to answer:
+E-commerce businesses generate large volumes of transactional data — orders, payments, reviews, delivery logs — but turning that into decisions requires clean data, correct metrics, and clear analysis. This project analyzes ~96,500 real delivered orders from [Olist](https://olist.com), a Brazilian e-commerce marketplace, to answer:
 
 > What are the biggest opportunities to improve customer experience, repeat purchasing, and revenue performance?
 
@@ -18,7 +14,37 @@ E-commerce businesses generate large volumes of transactional data — orders, p
 2. Which product categories and geographic regions drive the most revenue?
 3. What share of customers make more than one purchase?
 4. Are late deliveries associated with lower customer review scores?
-5. Which customer segments (by recency, frequency, and monetary value) represent the best retention opportunities?
+5. Which customer segments represent the best retention opportunities?
+
+## Dashboard
+
+Four pages, built with Streamlit + Plotly on top of a validated DuckDB analytical layer:
+
+- **Executive Overview** — headline KPIs, monthly revenue trend, category/state revenue, delivery and review snapshots.
+- **Customer Intelligence** — customer segmentation, retention windows, and a cohort-retention heatmap.
+- **Operations** — delivery performance and its relationship to customer reviews, including a state-level breakdown.
+- **Recommendations** — evidence-based findings (Finding → Evidence → Implication → Action).
+
+<!-- Screenshots not committed yet — see "Capturing Screenshots" below to add them. -->
+
+**Run it:**
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+(Requires the analytical database — see "Running Locally" below for full first-time setup.)
+
+### Capturing Screenshots
+
+Screenshots weren't captured automatically (no headless browser was available in the environment this was built in). To add them: run the app, open `http://localhost:8501`, screenshot each of the 4 pages, save them to `assets/screenshots/` (e.g. `executive_overview.png`, `customer_intelligence.png`, `operations.png`, `recommendations.png`), then reference them here with `![Executive Overview](assets/screenshots/executive_overview.png)`.
+
+## Key Insights
+
+- **Revenue reached R$13.22M** across 96,478 delivered orders (AOV R$137.04), growing steadily through 2017 before plateauing in 2018 — driven by order volume, not AOV, which stayed within a narrow R$124–152 band.
+- **Repeat purchasing is rare:** only 3.0% of customers ever placed a second delivered order. This is low enough that traditional RFM segmentation doesn't fit the data (97% of customers have Frequency = 1) — a behavior-based segmentation is used instead.
+- **A small segment drives disproportionate revenue:** "High-Value One-Time" customers are 23.2% of customers but 57.8% of revenue — the single most actionable finding for retention targeting.
+- **Late deliveries are strongly associated with lower reviews:** 4.29/5 average for on-time/early orders vs. 2.27/5 for late orders, falling monotonically with delay length.
+- **Performance is geographically concentrated:** São Paulo drives ~38% of revenue with the best delivery/review metrics; Rio de Janeiro, the #2 state by volume, notably underperforms on both (87.9% on-time vs. SP's 95.5%).
 
 ## Tech Stack
 
@@ -26,7 +52,7 @@ E-commerce businesses generate large volumes of transactional data — orders, p
 - **SQL** (DuckDB) — analytical queries over the cleaned dataset
 - **Streamlit** — interactive dashboard
 - **Plotly** — visualization
-- **pytest** — correctness tests for key metrics
+- **pytest** — correctness tests for key metrics and transformations
 
 ## Dataset
 
@@ -133,6 +159,8 @@ A superficially uniform "97% one-time" customer base splits into very different 
 
 **Time to second purchase** (repeat customers only, n=2,801): median 28 days, mean 81 (right-skewed) — a different statistic from the retention windows above, since it conditions on having already returned rather than measuring the probability of returning.
 
+**Cross-language consistency.** Every "days between two timestamps" calculation in this project (recency, delivery delay, time to second purchase) uses **exact elapsed time, floored** — pandas' native `Timedelta.days` behavior. SQL queries that compute the same thing use `FLOOR(DATE_DIFF('second', a, b) / 86400.0)` to match exactly, rather than DuckDB's `DATE_DIFF('day', ...)`, which counts calendar-date boundaries crossed and can differ by 1 day depending on time-of-day. This was caught during Phase 6 as a ~0.06%-of-customers discrepancy at the 90-day segmentation threshold; Python and SQL now assign identical segments to every customer. The 90-day "recent" cutoff itself is a business heuristic chosen for consistency with the retention-window analysis, not a statistically optimized threshold.
+
 ## Project Structure
 
 ```
@@ -151,7 +179,7 @@ retail-intelligence/
 
 ## Methodology
 
-This project is built in phases, each verified before moving to the next: dataset exploration → data cleaning and modelling → core metric definitions → analysis of the core business questions → dashboard → advanced analytics (RFM, cohorts) → documentation. Key definitions (revenue, valid orders, repeat customers, delivery delay) are documented explicitly before being calculated, and no profit or margin metrics are reported since the dataset contains no cost-of-goods data.
+This project is built in phases, each verified before moving to the next: dataset exploration → data cleaning and modelling → core metrics and business analysis → customer retention, cohort, and segmentation analysis → interactive dashboard → documentation. Key definitions (revenue, valid orders, repeat customers, delivery delay) are documented explicitly before being calculated, and no profit or margin metrics are reported since the dataset contains no cost-of-goods data.
 
 ## Running Locally
 
@@ -161,8 +189,10 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Place the Olist CSVs in data/raw/ — see data/raw/README.md
+python -m src.database        # builds data/processed/retail_intelligence.duckdb
 
-streamlit run app.py
+streamlit run app.py          # dashboard at http://localhost:8501
+pytest                        # run the test suite
 ```
 
 ## Limitations
@@ -171,7 +201,10 @@ streamlit run app.py
 - No cost-of-goods data, so profit/margin cannot be calculated — only revenue.
 - Delivery-delay/review-score analysis is observational (association, not proven causation).
 - Some orders have missing or delayed reviews, which are treated as missing data, not assumed to be poor reviews.
+- Customer segmentation and cohort/retention analysis (Customer Intelligence page) intentionally ignore the sidebar's date/state filters, since a segment or cohort describes a customer's complete purchase history — filtering to a partial window would misclassify customers.
 
 ## Future Improvements
 
-To be revisited once the core analysis is complete.
+- Add real dashboard screenshots to `assets/screenshots/` (see "Capturing Screenshots" above).
+- Deploy the dashboard (e.g. Streamlit Community Cloud) once the above is polished.
+- Explore seller-level delivery performance (mentioned in Recommendations) as a deeper operational drill-down.

@@ -49,7 +49,9 @@ customer_summary AS (
         customer_unique_id,
         COUNT(DISTINCT order_id)                                   AS delivered_order_count,
         SUM(item_revenue)                                          AS total_revenue,
-        DATE_DIFF('day', MAX(order_purchase_timestamp), (SELECT census_date FROM census)) AS recency_days
+        -- FLOOR(seconds / 86400) = exact elapsed days, matching pandas
+        -- Timedelta.days — see README.md, "Cross-Language Consistency"
+        FLOOR(DATE_DIFF('second', MAX(order_purchase_timestamp), (SELECT census_date FROM census)) / 86400.0) AS recency_days
     FROM orders_analytics
     WHERE is_delivered
     GROUP BY customer_unique_id
