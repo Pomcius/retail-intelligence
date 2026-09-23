@@ -2,7 +2,7 @@
 
 Interactive e-commerce business intelligence dashboard built with Python, SQL, DuckDB and Streamlit — analyzing revenue, customer retention and delivery operations for ~96,500 real orders from the Olist Brazilian marketplace.
 
-**Live demo:** _coming soon — add the Streamlit Community Cloud URL here after deploying_
+**Live demo:** (https://pomciusretail.streamlit.app)
 
 **Stack:** Python · pandas · SQL (DuckDB) · Streamlit · Plotly · pytest
 
