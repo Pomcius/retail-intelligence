@@ -16,6 +16,8 @@ from src import cleaning
 from src.data_loader import load_raw_tables
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "processed" / "retail_intelligence.duckdb"
+# Minimal committed database the dashboard reads (see src/export_dashboard_db.py).
+DASHBOARD_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "dashboard.duckdb"
 
 
 def build_analytical_tables(raw: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -136,7 +138,7 @@ def build_database(db_path: Path = DB_PATH) -> None:
 
 
 def get_connection(db_path: Path = DB_PATH, read_only: bool = True) -> duckdb.DuckDBPyConnection:
-    """Connect to the built analytical database. Raises if it hasn't been built yet."""
+    """Connect to the built analytical database. Raises a clear error if the file is missing."""
     if not db_path.exists():
         raise FileNotFoundError(f"{db_path} not found — run `python -m src.database` to build it.")
     return duckdb.connect(str(db_path), read_only=read_only)

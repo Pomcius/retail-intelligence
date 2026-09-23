@@ -16,6 +16,8 @@ data/raw/*.csv
 data/processed/*.parquet
 data/processed/*.csv
 *.duckdb
+# ...except the small deployment database the dashboard reads
+!data/dashboard.duckdb
 
 # Environment / secrets
 .env

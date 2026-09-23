@@ -41,6 +41,6 @@ dashboard.render_methodology_expander()
 
 if not dashboard.database_exists():
     st.warning(
-        "The analytical database hasn't been built yet. Place the Olist CSVs in `data/raw/` "
-        "(see `data/raw/README.md`) and run `python -m src.database`, then reload this page."
+        "`data/dashboard.duckdb` is missing. Restore it with `git checkout data/dashboard.duckdb`, "
+        "or rebuild it (see README, \"Running Locally\"), then reload this page."
     )

@@ -1,6 +1,29 @@
 # Retail Intelligence
 
-An interactive business intelligence dashboard analyzing revenue, customer retention, and delivery operations for a real Brazilian e-commerce marketplace.
+Interactive e-commerce business intelligence dashboard built with Python, SQL, DuckDB and Streamlit — analyzing revenue, customer retention and delivery operations for ~96,500 real orders from the Olist Brazilian marketplace.
+
+**Live demo:** _coming soon — add the Streamlit Community Cloud URL here after deploying_
+
+**Stack:** Python · pandas · SQL (DuckDB) · Streamlit · Plotly · pytest
+
+![Executive Overview](assets/screenshots/executive-overview.png)
+
+**Business problem:** where are the biggest opportunities to improve customer experience, repeat purchasing, and revenue performance?
+
+**Key findings** (delivered orders only; revenue = product revenue, not profit)
+- **R$13.22M** revenue across **96,478** delivered orders (AOV R$137.04).
+- Only **3.0%** of customers ever place a second order — repeat purchasing is the core weakness.
+- "High-value one-time" customers are **23.2%** of customers but **57.8%** of revenue — the top retention target.
+- Late deliveries are strongly associated with lower reviews: **4.29** vs. **2.27** average score (association, not proven causation).
+
+<details>
+<summary>More screenshots</summary>
+
+![Customer Intelligence](assets/screenshots/customer-intelligence.png)
+![Operations](assets/screenshots/operations.png)
+![Recommendations](assets/screenshots/recommendations.png)
+
+</details>
 
 ## Overview
 
@@ -25,18 +48,11 @@ Four pages, built with Streamlit + Plotly on top of a validated DuckDB analytica
 - **Operations** — delivery performance and its relationship to customer reviews, including a state-level breakdown.
 - **Recommendations** — evidence-based findings (Finding → Evidence → Implication → Action).
 
-<!-- Screenshots not committed yet — see "Capturing Screenshots" below to add them. -->
-
-**Run it:**
+**Run it** (works from a fresh clone — no raw data or Kaggle account needed):
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
-(Requires the analytical database — see "Running Locally" below for full first-time setup.)
-
-### Capturing Screenshots
-
-Screenshots weren't captured automatically (no headless browser was available in the environment this was built in). To add them: run the app, open `http://localhost:8501`, screenshot each of the 4 pages, save them to `assets/screenshots/` (e.g. `executive_overview.png`, `customer_intelligence.png`, `operations.png`, `recommendations.png`), then reference them here with `![Executive Overview](assets/screenshots/executive_overview.png)`.
 
 ## Key Insights
 
@@ -82,7 +98,7 @@ erDiagram
 
 ## Cleaning & Analytical Tables
 
-Raw CSVs are transformed into clean, validated tables by `src/cleaning.py` and written to a DuckDB database by `src/database.py` (`python -m src.database` rebuilds it from `data/raw/`). Logic lives in `src/`, not in notebooks, so it's reusable by both SQL queries and the dashboard.
+Raw CSVs are transformed into clean, validated tables by `src/cleaning.py` and written to a DuckDB database by `src/database.py` (`python -m src.database` rebuilds it from `data/raw/`; `python -m src.export_dashboard_db` then slims it to the dashboard's deployment database). Logic lives in `src/`, not in notebooks, so it's reusable by both SQL queries and the dashboard.
 
 **Primary analytical population.** Headline revenue, customer, AOV, retention, and delivery KPIs use **`order_status == "delivered"`** only (`orders_analytics.is_delivered`). Other statuses (canceled, unavailable, shipped, processing, invoiced, created, approved) are preserved in the same table, never dropped, so operational analysis of non-delivered orders remains possible — they're just excluded from headline "realized performance" numbers. The rule is defined once (`cleaning.COMPLETED_ORDER_STATUS` / `filter_delivered_orders`) rather than repeated ad hoc.
 
@@ -167,8 +183,9 @@ A superficially uniform "97% one-time" customer base splits into very different 
 retail-intelligence/
 ├── app.py                  # Streamlit entry point
 ├── data/
+│   ├── dashboard.duckdb    # Minimal deployment database (committed; read by the dashboard)
 │   ├── raw/                # Olist CSVs (not committed — see data/raw/README.md)
-│   └── processed/          # Cleaned/aggregated tables
+│   └── processed/          # Full analytical database (built locally, not committed)
 ├── notebooks/               # Exploration, cleaning, and analysis notebooks
 ├── sql/                     # DuckDB analytical queries
 ├── src/                     # Reusable Python: loading, cleaning, metrics, charts
@@ -183,17 +200,30 @@ This project is built in phases, each verified before moving to the next: datase
 
 ## Running Locally
 
+There are two distinct workflows. The dashboard does not need the raw data.
+
+**Portfolio deployment** — prebuilt minimal database → dashboard
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# Place the Olist CSVs in data/raw/ — see data/raw/README.md
-python -m src.database        # builds data/processed/retail_intelligence.duckdb
-
-streamlit run app.py          # dashboard at http://localhost:8501
-pytest                        # run the test suite
+streamlit run app.py          # http://localhost:8501
 ```
+The dashboard reads [data/dashboard.duckdb](data/dashboard.duckdb) (~12 MB, committed): a *derived deployment artifact* containing only the two tables and the columns the dashboard uses (`orders_analytics`, `order_items_analytics`), copied unchanged from the full analytical database. It is **not** the raw Olist data.
+
+**Development / reproducible pipeline** — raw Olist CSVs → cleaning/modeling → analytical database → deployment database
+```bash
+pip install -r requirements-dev.txt
+# Download the Olist CSVs into data/raw/ — see data/raw/README.md
+python -m src.database               # builds data/processed/retail_intelligence.duckdb (all tables, validated)
+python -m src.export_dashboard_db    # regenerates data/dashboard.duckdb
+pytest                               # run the test suite
+```
+
+The deployment database contains order-level records derived from the Olist dataset (already anonymized by Olist) and is redistributed under the dataset's CC BY-NC-SA 4.0 terms — attribution above, non-commercial use.
+
+## Deploying to Streamlit Community Cloud
+
+Repository: this repo · Branch: `main` · Main file path: `app.py` · Dependencies: `requirements.txt` (auto-detected). No secrets required.
 
 ## Limitations
 
@@ -205,6 +235,4 @@ pytest                        # run the test suite
 
 ## Future Improvements
 
-- Add real dashboard screenshots to `assets/screenshots/` (see "Capturing Screenshots" above).
-- Deploy the dashboard (e.g. Streamlit Community Cloud) once the above is polished.
 - Explore seller-level delivery performance (mentioned in Recommendations) as a deeper operational drill-down.

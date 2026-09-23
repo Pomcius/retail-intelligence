@@ -13,18 +13,18 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from src.database import DB_PATH, get_connection
+from src.database import DASHBOARD_DB_PATH, get_connection
 
 # --------------------------------------------------------------------------
 # Cached data loading
 # --------------------------------------------------------------------------
 def database_exists() -> bool:
-    return DB_PATH.exists()
+    return DASHBOARD_DB_PATH.exists()
 
 
 @st.cache_resource(show_spinner=False)
 def _connection():
-    return get_connection(read_only=True)
+    return get_connection(DASHBOARD_DB_PATH, read_only=True)
 
 
 @st.cache_data(show_spinner="Loading order data...")
@@ -39,15 +39,14 @@ def load_order_items_analytics() -> pd.DataFrame:
 
 def require_database() -> bool:
     """Stops page execution with a clear message if the DuckDB database
-    hasn't been built yet, instead of crashing with a raw exception."""
+    is missing, instead of crashing with a raw exception."""
     if not database_exists():
         st.error(
-            "**Database not found.**\n\n"
-            "This dashboard reads from `data/processed/retail_intelligence.duckdb`, "
-            "which is generated from the raw Olist CSVs rather than committed to the repo.\n\n"
-            "To build it:\n"
+            "**Dashboard database not found.**\n\n"
+            "This dashboard reads from `data/dashboard.duckdb`, which is committed to the repo. "
+            "If it is missing, restore it with `git checkout data/dashboard.duckdb`, or rebuild it:\n"
             "1. Place the Olist CSVs in `data/raw/` (see `data/raw/README.md`)\n"
-            "2. Run `python -m src.database` from the project root"
+            "2. `python -m src.database && python -m src.export_dashboard_db`"
         )
         st.stop()
     return True
