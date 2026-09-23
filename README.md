@@ -4,7 +4,7 @@ A business intelligence platform analyzing revenue, customer retention, and deli
 
 ## Status
 
-🚧 Early development. Core metrics and initial analysis are complete and verified (Phase 4); the interactive dashboard has not been built yet — see [Core Metrics](#core-metrics) below and [Methodology](#methodology).
+🚧 Early development. Core metrics, retention, and customer segmentation analysis are complete and verified (Phases 4–5); the interactive dashboard has not been built yet — see [Core Metrics](#core-metrics) and [Customer Retention & Segmentation](#customer-retention--segmentation) below.
 
 ## Overview
 
@@ -108,6 +108,30 @@ Calculated in `src/metrics.py`, cross-validated against independent SQL queries 
 **Delivery delay and review scores are associated, not proven causal.** On-time/early orders average 4.29/5; late orders average 2.27/5, falling monotonically as delay increases (4.32 → 1.70 across delay buckets). This is a strong pattern in observational data, described here as an association.
 
 Revenue is concentrated in São Paulo (38% of total, from `sql/01_revenue_analysis.sql`), and the top product category (`health_beauty`) is only 9.3% of revenue — no category or region dominates disproportionately. Full monthly trends, category rankings, and state-level breakdowns are in the notebook.
+
+## Customer Retention & Segmentation
+
+Detailed in [notebooks/04_customer_retention.ipynb](notebooks/04_customer_retention.ipynb) (`src/segmentation.py`, `sql/05_cohort_analysis.sql`, `sql/06_customer_segmentation.sql`).
+
+**Traditional RFM was evaluated and rejected.** 97.0% of customers have Frequency = 1 (a single delivered order) — a quintile-based Frequency score would put nearly everyone in the same bin, contributing noise rather than signal. Recency (median 218 days, std 153) and Monetary value (heavily right-skewed: mean R$141.62 vs. median R$89.73, skew ≈ 9.7, top 10% of customers = 41.1% of revenue) do have real variation, so they're used directly instead of being forced into an ill-fitting RFM framework.
+
+**Segmentation used instead** — behavior-based, with two documented, data-driven thresholds (75th percentile of customer revenue = "high value"; 90-day recency, matching the retention-window analysis below = "recent"):
+
+| Segment | Customers | % of Customers | % of Revenue |
+|---|---|---|---|
+| High-Value One-Time | 21,661 | 23.2% | 57.8% |
+| One-Time Lapsed | 55,164 | 59.1% | 29.3% |
+| One-Time Recent | 13,732 | 14.7% | 7.3% |
+| High-Value Repeat | 1,679 | 1.8% | 4.7% |
+| Repeat Customer | 1,122 | 1.2% | 0.8% |
+
+A superficially uniform "97% one-time" customer base splits into very different value tiers: `High-Value One-Time` customers are less than a quarter of customers but contribute more than half of all revenue.
+
+**Cohort retention** (month of first delivered purchase): retention drops sharply after each cohort's first month, typically to under 1%/month, with no clear improving or worsening trend across cohorts — low repeat purchasing looks structural, not a recent decline. Cells for calendar months that haven't happened yet for a cohort are left blank, never shown as 0%, to avoid implying churn that hasn't been observed.
+
+**Retention windows, adjusted for censoring** (only counting customers who've had enough time to be observed returning): 30-day 1.6%, 60-day 2.0%, 90-day 2.3%, 180-day 3.1% — all computed with an explicit eligibility filter, since a customer whose first purchase was recent hasn't had time to return yet and shouldn't be counted against the window.
+
+**Time to second purchase** (repeat customers only, n=2,801): median 28 days, mean 81 (right-skewed) — a different statistic from the retention windows above, since it conditions on having already returned rather than measuring the probability of returning.
 
 ## Project Structure
 
